@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Mikroskop-Kunde – Drag & Drop</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #222;
+        }
+
+        .container {
+            width: min(1250px, 100%);
+            margin: auto;
+            padding: 28px;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            text-align: center;
+            color: #29346f;
+        }
+
+        .subtitle {
+            margin: 0 0 24px;
+            text-align: center;
+            color: #666;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: minmax(500px, 1.2fr) minmax(300px, 0.8fr);
+            gap: 30px;
+            align-items: start;
+        }
+
+        /* =========================
+           MIKROSKOP-BEREICH
+        ========================= */
+
+        .image-section {
+            width: 100%;
+            max-width: 650px;
+            margin: auto;
+        }
+
+        .microscope-image-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 976 / 1088;
+            overflow: hidden;
+            border: 2px solid #dfe3ef;
+            border-radius: 12px;
+            background: white;
+        }
+
+        .microscope-image {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .annotation-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .callout {
+            fill: none;
+            stroke: #e53935;
+            stroke-width: 3;
+            stroke-linecap: round;
+        }
+
+        .number-marker {
+            fill: #e53935;
+            stroke: white;
+            stroke-width: 4;
+        }
+
+        .number-text {
+            fill: white;
+            font-family: Arial, sans-serif;
+            font-size: 20px;
+            font-weight: bold;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        /* Unsichtbare Drop-Zonen direkt bei den Bauteilen */
+        .drop-zone {
+            position: absolute;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 80px;
+            min-height: 38px;
+            padding: 4px;
+            border: 2px dashed transparent;
+            border-radius: 8px;
+            color: transparent;
+            font-size: 0.8rem;
+            text-align: center;
+            transition: 0.2s;
+        }
+
+        .drop-zone.drag-over {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.25);
+        }
+
+        .drop-zone.correct {
+            border-color: #2e9d55;
+            background: rgba(46, 157, 85, 0.22);
+        }
+
+        .drop-zone.incorrect {
+            border-color: #d93838;
+            background: rgba(217, 56, 56, 0.22);
+        }
+
+        /*
+         * Positionen der Drop-Zonen.
+         * Die Angaben beziehen sich auf das Bild mit 976 x 1088 Pixeln.
+         */
+
+        /* 1: Okular */
+        #zone-1 {
+            left: 68%;
+            top: 4%;
+            width: 13%;
+            height: 8%;
+        }
+
+        /* 2: Revolverkopf */
+        #zone-2 {
+            left: 32%;
+            top: 34%;
+            width: 23%;
+            height: 9%;
+        }
+
+        /* 3: Objektive */
+        #zone-3 {
+            left: 25%;
+            top: 40%;
+            width: 30%;
+            height: 14%;
+        }
+
+        /* 4: Tubus */
+        #zone-4 {
+            left: 42%;
+            top: 11%;
+            width: 25%;
+            height: 18%;
+        }
+
+        /* 5: Objekttisch */
+        #zone-5 {
+            left: 25%;
+            top: 56%;
+            width: 43%;
+            height: 10%;
+        }
+
+        /* 6: Kondensor */
+        #zone-6 {
+            left: 35%;
+            top: 65%;
+            width: 25%;
+            height: 11%;
+        }
+
+        /* 7: Lichtquelle */
+        #zone-7 {
+            left: 34%;
+            top: 75%;
+            width: 25%;
+            height: 10%;
+        }
+
+        /* 8: Stativ */
+        #zone-8 {
+            left: 61%;
+            top: 33%;
+            width: 22%;
+            height: 31%;
+        }
+
+        /* 9: Grobtrieb – äußerer Ring */
+        #zone-9 {
+            left: 66%;
+            top: 56%;
+            width: 11%;
+            height: 12%;
+        }
+
+        /* 10: Feintrieb – innerer Ring */
+        #zone-10 {
+            left: 68%;
+            top: 68%;
+            width: 9%;
+            height: 8%;
+        }
+
+        /* 11: Mikroskop-Fuß */
+        #zone-11 {
+            left: 22%;
+            top: 82%;
+            width: 62%;
+            height: 15%;
+        }
+
+        /* =========================
+           BEGRIFFSBEREICH
+        ========================= */
+
+        .exercise-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .panel-box {
+            padding: 16px;
+            border-radius: 12px;
+            background: #f5f6fb;
+        }
+
+        .panel-box h2 {
+            margin: 0 0 12px;
+            font-size: 1.15rem;
+            color: #29346f;
+        }
+
+        .word-bank {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            min-height: 80px;
+            padding: 12px;
+            border: 2px dashed #c4c9df;
+            border-radius: 10px;
+            background: white;
+        }
+
+        .word {
+            padding: 10px 13px;
+            border: 1px solid #5367d4;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+            cursor: grab;
+            user-select: none;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .word:hover {
+            transform: translateY(-2px);
+            background: #5367d4;
+        }
+
+        .word.dragging {
+            opacity: 0.45;
+        }
+
+        .word.correct {
+            background: #2e9d55;
+            border-color: #218642;
+        }
+
+        .word.incorrect {
+            background: #d93838;
+            border-color: #b52828;
+        }
+
+        .assigned-words {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .assigned-item {
+            min-height: 42px;
+            padding: 8px;
+            border: 2px dashed #c4c9df;
+            border-radius: 7px;
+            background: white;
+            font-size: 0.9rem;
+        }
+
+        .assigned-item strong {
+            color: #29346f;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: 0;
+            border-radius: 7px;
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-check {
+            background: #667eea;
+        }
+
+        .btn-check:hover {
+            background: #5367d4;
+        }
+
+        .btn-reset {
+            background: #777;
+        }
+
+        .btn-reset:hover {
+            background: #555;
+        }
+
+        .result {
+            min-height: 33px;
+            text-align: center;
+            font-weight: bold;
+	    font-size: 1.3rem;
+        }
+
+        .hint {
+            margin: 0;
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 900px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .image-section {
+                max-width: 650px;
+            }
+        }
+
+        @media (max-width: 560px) {
+            body {
+                padding: 8px;
+            }
+
+            .container {
+                padding: 16px;
+            }
+
+            .assigned-words {
+                grid-template-columns: 1fr;
+            }
+
+            .buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="container">
+
+        <h1>🔬 Mikroskop-Kunde</h1>
+
+        <p class="subtitle">
+            Ziehe jeden Begriff auf die passende Stelle am Mikroskop.
+        </p>
+
+        <div class="content">
+
+            <!-- =========================
+                 MIKROSKOP MIT DROP-ZONEN
+            ========================== -->
+
+            <section class="image-section">
+                <div class="microscope-image-wrapper">
+
+                    <img
+                        src="mikroskop.png"
+                        alt="Mikroskop mit nummerierten Bauteilen"
+                        class="microscope-image"
+                    >
+
+                    <!-- Nummern und Linien -->
+                    <svg
+                        class="annotation-layer"
+                        viewBox="0 0 976 1088"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                    >
+                        <!-- 1: Okular -->
+                        <line
+                            class="callout"
+                            x1="716"
+                            y1="76"
+                            x2="874"
+                            y2="76"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="902"
+                            cy="76"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="902"
+                            y="76"
+                        >1</text>
+
+                        <!-- 2: Revolverkopf -->
+                        <line
+                            class="callout"
+                            x1="357"
+                            y1="400"
+                            x2="105"
+                            y2="400"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="76"
+                            cy="400"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="76"
+                            y="400"
+                        >2</text>
+
+                        <!-- 3: Objektive -->
+                        <line
+                            class="callout"
+                            x1="367"
+                            y1="526"
+                            x2="105"
+                            y2="566"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="76"
+                            cy="566"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="76"
+                            y="566"
+                        >3</text>
+
+
+                        <!-- 4: Tubus -->
+                        <line
+                            class="callout"
+                            x1="540"
+                            y1="202"
+                            x2="874"
+                            y2="252"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="902"
+                            cy="252"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="902"
+                            y="252"
+                        >4</text>
+
+                        <!-- 5: Objekttisch -->
+                        <line
+                            class="callout"
+                            x1="285"
+                            y1="645"
+                            x2="105"
+                            y2="645"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="76"
+                            cy="645"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="76"
+                            y="645"
+                        >5</text>
+
+                        <!-- 6: Kondensor -->
+                        <line
+                            class="callout"
+                            x1="421"
+                            y1="735"
+                            x2="105"
+                            y2="735"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="76"
+                            cy="735"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="76"
+                            y="735"
+                        >6</text>
+
+                        <!-- 7: Lichtquelle -->
+                        <line
+                            class="callout"
+                            x1="417"
+                            y1="832"
+                            x2="105"
+                            y2="832"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="76"
+                            cy="832"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="76"
+                            y="832"
+                        >7</text>
+
+                        <!-- 8: Stativ -->
+                        <line
+                            class="callout"
+                            x1="760"
+                            y1="528"
+                            x2="874"
+                            y2="530"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="902"
+                            cy="530"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="902"
+                            y="530"
+                        >8</text>
+
+                        <!-- 9: Grobtrieb – äußerer großer Ring -->
+<line
+    class="callout"
+    x1="704"
+    y1="714"
+    x2="874"
+    y2="700"
+/>
+<circle
+    class="number-marker"
+    cx="902"
+    cy="700"
+    r="25"
+/>
+<text
+    class="number-text"
+    x="902"
+    y="700"
+>9</text>
+
+
+<!-- 10: Feintrieb – innerer Ring des Grobtriebs -->
+<line
+    class="callout"
+    x1="704"
+    y1="762"
+    x2="874"
+    y2="762"
+/>
+<circle
+    class="number-marker"
+    cx="902"
+    cy="762"
+    r="25"
+/>
+<text
+    class="number-text"
+    x="902"
+    y="762"
+>10</text>
+
+                        <!-- 11: Mikroskop-Fuß -->
+                        <line
+                            class="callout"
+                            x1="690"
+                            y1="971"
+                            x2="874"
+                            y2="971"
+                        />
+                        <circle
+                            class="number-marker"
+                            cx="902"
+                            cy="971"
+                            r="25"
+                        />
+                        <text
+                            class="number-text"
+                            x="902"
+                            y="971"
+                        >11</text>
+                    </svg>
+
+                    <!-- Drop-Zonen -->
+                    <div class="drop-zone" id="zone-1" data-number="1"></div>
+                    <div class="drop-zone" id="zone-2" data-number="2"></div>
+                    <div class="drop-zone" id="zone-3" data-number="3"></div>
+                    <div class="drop-zone" id="zone-4" data-number="4"></div>
+                    <div class="drop-zone" id="zone-5" data-number="5"></div>
+                    <div class="drop-zone" id="zone-6" data-number="6"></div>
+                    <div class="drop-zone" id="zone-7" data-number="7"></div>
+                    <div class="drop-zone" id="zone-8" data-number="8"></div>
+                    <div class="drop-zone" id="zone-9" data-number="9"></div>
+                    <div class="drop-zone" id="zone-10" data-number="10"></div>
+                    <div class="drop-zone" id="zone-11" data-number="11"></div>
+                </div>
+            </section>
+
+
+            <!-- =========================
+                 BEGRIFFE UND AUSWERTUNG
+            ========================== -->
+
+            <section class="exercise-panel">
+
+                <div class="panel-box">
+                    <h2>Begriffe</h2>
+
+                    <p class="hint">
+                        Ziehe die Begriffe auf die passenden Bereiche des Mikroskops.
+                    </p>
+
+                    <div
+                        id="word-bank"
+                        class="word-bank"
+                    ></div>
+                </div>
+
+
+                <div class="panel-box">
+                    <h2>Zuordnung</h2>
+
+                    <div
+                        id="assigned-words"
+                        class="assigned-words"
+                    ></div>
+                </div>
+
+
+                <div class="buttons">
+                    <button
+                        type="button"
+                        class="btn-check"
+                        id="check-button"
+                    >
+                        ✓ Überprüfen
+                    </button>
+
+                    <button
+                        type="button"
+                        class="btn-reset"
+                        id="reset-button"
+                    >
+                        ↻ Zurücksetzen
+                    </button>
+                </div>
+
+                <div
+                    id="result"
+                    class="result"
+                    aria-live="polite"
+                ></div>
+            </section>
+        </div>
+    </main>
+
+
+    <script>
+        /*
+         * Die Nummerierung entspricht den Nummern im Bild.
+         */
+        const microscopeParts = [
+            {
+                number: 1,
+                name: "Okular"
+            },
+            {
+                number: 2,
+                name: "Revolverkopf"
+            },
+            {
+                number: 3,
+                name: "Objektive"
+            },
+            {
+                number: 4,
+                name: "Tubus"
+            },
+            {
+                number: 5,
+                name: "Objekttisch"
+            },
+            {
+                number: 6,
+                name: "Kondensor"
+            },
+            {
+                number: 7,
+                name: "Lichtquelle"
+            },
+            {
+                number: 8,
+                name: "Stativ"
+            },
+            {
+                number: 9,
+                name: "Grobtrieb"
+            },
+            {
+                number: 10,
+                name: "Feintrieb"
+            },
+            {
+                number: 11,
+                name: "Mikroskop-Fuß"
+            }
+        ];
+
+        const wordBank =
+            document.getElementById("word-bank");
+
+        const assignedWords =
+            document.getElementById("assigned-words");
+
+        let draggedWord = null;
+        let draggedFromZone = null;
+
+
+        /*
+         * Erstellt die Begriffe in zufälliger Reihenfolge.
+         */
+        function createWords() {
+            const shuffledParts = [...microscopeParts]
+                .sort(() => Math.random() - 0.5);
+
+            shuffledParts.forEach(part => {
+                const word = document.createElement("div");
+
+                word.className = "word";
+                word.draggable = true;
+                word.textContent = part.name;
+                word.dataset.answer = part.number;
+
+                word.addEventListener("dragstart", handleDragStart);
+                word.addEventListener("dragend", handleDragEnd);
+
+                wordBank.appendChild(word);
+            });
+        }
+
+
+        /*
+         * Erstellt die Übersicht der Zuordnungen.
+         */
+        function createAssignmentList() {
+            microscopeParts.forEach(part => {
+                const item = document.createElement("div");
+
+                item.className = "assigned-item";
+                item.id = `assigned-${part.number}`;
+
+                item.innerHTML = `
+                    <strong>${part.number}:</strong>
+                    <span>Noch nicht belegt</span>
+                `;
+
+                assignedWords.appendChild(item);
+            });
+        }
+
+
+        function handleDragStart(event) {
+            draggedWord = event.currentTarget;
+            draggedFromZone =
+                draggedWord.parentElement.classList.contains("drop-zone")
+                    ? draggedWord.parentElement
+                    : null;
+
+            draggedWord.classList.add("dragging");
+
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData(
+                "text/plain",
+                draggedWord.dataset.answer
+            );
+        }
+
+
+        function handleDragEnd() {
+            if (draggedWord) {
+                draggedWord.classList.remove("dragging");
+            }
+
+            document.querySelectorAll(".drag-over")
+                .forEach(zone => {
+                    zone.classList.remove("drag-over");
+                });
+        }
+
+
+        /*
+         * Drag-and-drop für die nummerierten Zielbereiche.
+         */
+        document.querySelectorAll(".drop-zone")
+            .forEach(zone => {
+
+                zone.addEventListener("dragover", event => {
+                    event.preventDefault();
+                    zone.classList.add("drag-over");
+                });
+
+                zone.addEventListener("dragleave", () => {
+                    zone.classList.remove("drag-over");
+                });
+
+                zone.addEventListener("drop", event => {
+                    event.preventDefault();
+
+                    zone.classList.remove("drag-over");
+
+                    if (!draggedWord) {
+                        return;
+                    }
+
+                    /*
+                     * Befindet sich dort bereits ein Begriff,
+                     * wird er zurück in die Begriffsliste gelegt.
+                     */
+                    const oldWord = zone.querySelector(".word");
+
+                    if (oldWord && oldWord !== draggedWord) {
+                        wordBank.appendChild(oldWord);
+                    }
+
+                    zone.appendChild(draggedWord);
+
+                    draggedWord.classList.remove(
+                        "correct",
+                        "incorrect"
+                    );
+
+                    updateAssignmentList();
+
+                    draggedWord = null;
+                    draggedFromZone = null;
+                });
+            });
+
+
+        /*
+         * Ziehen in die ursprüngliche Begriffsliste,
+         * um eine Zuordnung wieder zu entfernen.
+         */
+        wordBank.addEventListener("dragover", event => {
+            event.preventDefault();
+        });
+
+        wordBank.addEventListener("drop", event => {
+            event.preventDefault();
+
+            if (!draggedWord) {
+                return;
+            }
+
+            wordBank.appendChild(draggedWord);
+
+            draggedWord.classList.remove(
+                "correct",
+                "incorrect"
+            );
+
+            updateAssignmentList();
+
+            draggedWord = null;
+            draggedFromZone = null;
+        });
+
+
+        /*
+         * Aktualisiert die Übersicht rechts.
+         */
+        function updateAssignmentList() {
+            microscopeParts.forEach(part => {
+                const item =
+                    document.getElementById(`assigned-${part.number}`);
+
+                const zone =
+                    document.getElementById(`zone-${part.number}`);
+
+                const word =
+                    zone.querySelector(".word");
+
+                const text =
+                    item.querySelector("span");
+
+                if (word) {
+                    text.textContent = word.textContent;
+                } else {
+                    text.textContent = "Noch nicht belegt";
+                }
+            });
+        }
+
+
+        /*
+         * Überprüft, ob jeder Begriff bei der richtigen Nummer liegt.
+         */
+        function checkAnswers() {
+            let correct = 0;
+            let assigned = 0;
+
+            microscopeParts.forEach(part => {
+                const zone =
+                    document.getElementById(`zone-${part.number}`);
+
+                const word =
+                    zone.querySelector(".word");
+
+                zone.classList.remove(
+                    "correct",
+                    "incorrect"
+                );
+
+                if (!word) {
+                    return;
+                }
+
+                assigned++;
+
+                const isCorrect =
+                    Number(word.dataset.answer) === part.number;
+
+                if (isCorrect) {
+                    correct++;
+                    zone.classList.add("correct");
+                    word.classList.add("correct");
+                } else {
+                    zone.classList.add("incorrect");
+                    word.classList.add("incorrect");
+                }
+            });
+
+            const result =
+                document.getElementById("result");
+
+            if (correct === microscopeParts.length) {
+                result.textContent =
+                    "🎉 Sehr gut! Alle 11 Begriffe sind richtig. 🎉";
+                result.style.color = "#218642";
+            } else {
+                result.textContent =
+                    `${correct} von 11 richtig – ${assigned} von 11 Feldern belegt.`;
+                result.style.color = "#555";
+            }
+        }
+
+
+        /*
+         * Setzt die Übung vollständig zurück.
+         */
+        function resetAnswers() {
+            document.querySelectorAll(".drop-zone .word")
+                .forEach(word => {
+                    word.classList.remove(
+                        "correct",
+                        "incorrect"
+                    );
+
+                    wordBank.appendChild(word);
+                });
+
+            document.querySelectorAll(".drop-zone")
+                .forEach(zone => {
+                    zone.classList.remove(
+                        "correct",
+                        "incorrect",
+                        "drag-over"
+                    );
+                });
+
+            document.getElementById("result")
+                .textContent = "";
+
+            updateAssignmentList();
+        }
+
+
+        document.getElementById("check-button")
+            .addEventListener("click", checkAnswers);
+
+        document.getElementById("reset-button")
+            .addEventListener("click", resetAnswers);
+
+
+        createWords();
+        createAssignmentList();
+    </script>
+</body>
+</html>
